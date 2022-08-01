@@ -1,0 +1,91 @@
+#!/usr/bin/env sh
+# vim: set ts=2 sw=2 tw=0 expandtab :
+
+set -eu
+
+GAPI_TRIES=4
+GAPI_DELAY=2
+GAPI_TMOUT=10
+
+test -z "${GITLAB_PRIVATE_TOKEN:-}" &&
+  {
+    printf '[FAIL] %s\n' "GITLAB_PRIVATE_TOKEN is not set!"
+    exit 1
+  }
+
+test -z "${GITLAB_SERVER:-}" &&
+  GITLAB_SERVER='https://gitlab.com/api/v4'
+
+test -z "${GITLAB_PROJECT:-}" &&
+  {
+    GITLAB_PROJECT='dps8m%2Fdps8m'
+    printf '[WARN] %s\n' \
+      "Using default GITLAB_PROJECT of (${GITLAB_PROJECT:?})" |
+        sed 's/%2F/\//'
+  }
+
+usage ()
+{
+  printf '[INFO] %s\n' "Usage: ${0:-gapi} <request> <request_args>"
+  exit 1
+}
+
+# Convert request to uppercase
+parseArgs ()
+{
+  GITLAB_REQUEST="$( printf "%s" "${1:?}" |
+    tr "[:lower:]" "[:upper:]" )" &&
+      shift
+}
+
+# Send request with ${CURL:-curl}
+sendAPI ()
+{
+  "${CURL:-curl}" -s -m "${GAPI_TMOUT:?}"               \
+    --header "PRIVATE-TOKEN: ${GITLAB_PRIVATE_TOKEN:?}" \
+    --request "${GITLAB_REQUEST:?}"                     \
+    "${GITLAB_SERVER:?}"/projects/"${GITLAB_PROJECT:?}"/"${1:?}"
+}
+
+retryIt ()
+{
+  COUNT=0
+  TRIES="${1:?}" &&
+    shift
+  while [ "${COUNT:?}" -lt "${TRIES:?}" ]; do
+    test ${COUNT:?} -ne 0 ||
+      printf '%s' "[INFO] "
+    test ${COUNT:?} -ne 0 &&
+      sleep "${GAPI_DELAY:?}"
+    # shellcheck disable=SC2068
+    OP=$(${@})
+    printf 'Result: %s\n' "${OP:-}" |
+      grep -v '^Result: $' |
+        sed 's/{"message":"//' |
+          tr -d '}"'
+    printf '%s' "${OP:-}" |
+      grep -q '"message":"[4-5][0-9][0-9] ' ||
+        {
+          printf 'Result: %s\n' "SUCCESS"
+          return 0
+        }
+    test "$(( ${COUNT:?} + 1 ))" -le "$(( ${TRIES:?} - 1 ))" &&
+      printf '%s: ' \
+        "[WARN] Retry $(( ${COUNT:?} + 1 )) of $(( ${TRIES:?} - 1 ))"
+    COUNT="$(( COUNT+1 ))"
+  done
+  printf '[FAIL] %s\n' "Request failed!"
+  return 1
+}
+
+test -z "${1:-}" &&
+  usage
+
+parseArgs "${1:?}" &&
+  shift
+
+test -z "${1:-}" &&
+  usage
+
+printf '%s\n' "[INFO] Request: ${GITLAB_REQUEST:?} ${1:?}"
+retryIt "${GAPI_TRIES:?}" sendAPI "${@}"
