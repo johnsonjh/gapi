@@ -21,13 +21,20 @@
 
 set -eu
 
+GAPI_VERSION="1.02"
 GAPI_TRIES=4
 GAPI_DELAY=2
 GAPI_TMOUT=10
 
+test -t 0 ||
+  {
+    printf '[FAIL] %s\n' "Not a tty!" >&2
+    exit 1
+  }
+
 test -z "${GITLAB_PRIVATE_TOKEN:-}" &&
   {
-    printf '[FAIL] %s\n' "GITLAB_PRIVATE_TOKEN is not set!"
+    printf '[FAIL] %s\n' "GITLAB_PRIVATE_TOKEN is not set!" >&2
     exit 1
   }
 
@@ -39,12 +46,22 @@ test -z "${GITLAB_PROJECT:-}" &&
     GITLAB_PROJECT='dps8m%2Fdps8m'
     printf '[WARN] %s\n' \
       "Using default GITLAB_PROJECT of (${GITLAB_PROJECT:?})" |
-        sed 's/%2F/\//'
+        sed 's/%2F/\//' >&2
   }
 
 usage ()
 {
-  printf '[INFO] %s\n' "Usage: ${0:-gapi} <request> <request_args>"
+  printf '[INFO] %s\n' "${0:-gapi} ${GAPI_VERSION:?}"                          >&2
+  printf '[INFO] %s\n' ""                                                      >&2
+  printf '[INFO] %s\n' "Usage:"                                                >&2
+  printf '[INFO] %s\n' "          ${0:-gapi} <request> <target>"               >&2
+  printf '[INFO] %s\n' ""                                                      >&2
+  printf '[INFO] %s\n' "Examples:"                                             >&2
+  printf '[INFO] %s\n' "          ${0:-gapi} delete pipelines/602248227"       >&2
+  printf '[INFO] %s\n' "          ${0:-gapi} get issues/156"                   >&2
+  printf '[INFO] %s\n' ""                                                      >&2
+  printf '[INFO] %s\n' "See https://docs.gitlab.com/ee/api/api_resources.html" >&2
+  printf '[INFO] %s\n' "for more complete documentation of GitLab's REST API." >&2
   exit 1
 }
 
@@ -72,27 +89,26 @@ retryIt ()
     shift
   while [ "${COUNT:?}" -lt "${TRIES:?}" ]; do
     test ${COUNT:?} -ne 0 ||
-      printf '%s' "[INFO] "
+      printf '%s' "[INFO] " >&2
     test ${COUNT:?} -ne 0 &&
       sleep "${GAPI_DELAY:?}"
     # shellcheck disable=SC2068
     OP=$(${@})
-    printf 'Result: %s\n' "${OP:-}" |
-      grep -v '^Result: $' |
-        sed 's/{"message":"//' |
-          tr -d '}"'
+    printf '%s ' 'Result:' >&2
+    printf '%s\n' "${OP:-}" |
+      grep -v '^Result: $'
     printf '%s' "${OP:-}" |
-      grep -q '"message":"[4-5][0-9][0-9] ' ||
+      grep -q '":"[4-5][0-9][0-9] ' ||
         {
-          printf 'Result: %s\n' "SUCCESS"
+          printf 'Result: %s\n' "SUCCESS" >&2
           return 0
         }
     test "$(( ${COUNT:?} + 1 ))" -le "$(( ${TRIES:?} - 1 ))" &&
       printf '%s: ' \
-        "[WARN] Retry $(( ${COUNT:?} + 1 )) of $(( ${TRIES:?} - 1 ))"
+        "[WARN] Retry $(( ${COUNT:?} + 1 )) of $(( ${TRIES:?} - 1 ))" >&2
     COUNT="$(( COUNT+1 ))"
   done
-  printf '[FAIL] %s\n' "Request failed!"
+  printf '[FAIL] %s\n' "Request failed!" >&2
   return 1
 }
 
@@ -105,5 +121,5 @@ parseArgs "${1:?}" &&
 test -z "${1:-}" &&
   usage
 
-printf '%s\n' "[INFO] Request: ${GITLAB_REQUEST:?} ${1:?}"
+printf '%s\n' "[INFO] Request: ${GITLAB_REQUEST:?} ${1:?}" >&2
 retryIt "${GAPI_TRIES:?}" sendAPI "${@}"
