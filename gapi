@@ -95,12 +95,11 @@ retryIt ()
     # shellcheck disable=SC2068
     OP=$(${@})
     printf '%s ' 'Result:' >&2
-    printf '%s\n' "${OP:-}" |
-      grep -v '^Result: $'
+    printf '%s\n' "${OP:-}"
     printf '%s' "${OP:-}" |
       grep -q '":"[4-5][0-9][0-9] ' ||
         {
-          printf 'Result: %s\n' "SUCCESS" >&2
+          printf '%s\n' "SUCCESS" >&2
           return 0
         }
     test "$(( ${COUNT:?} + 1 ))" -le "$(( ${TRIES:?} - 1 ))" &&
