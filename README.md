@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: MIT-0 -->
-<!-- Copyright (c) 2022 Jeffrey H. Johnson <trnsz@pobox.com> -->
+<!-- Copyright (c) 2022 Jeffrey H. Johnson -->
 # gapi
 gapi: Shell script for GitLab API calls
 
